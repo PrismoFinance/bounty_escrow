@@ -6,10 +6,16 @@ pub struct InstantiateMsg {% raw %}{{% endraw %}{% unless minimal %}
 {% endunless %}}
 
 #[cw_serde]
-pub enum ExecuteMsg {% raw %}{{% endraw %}{% unless minimal %}
-    Increment {},
-    Reset { count: i32 },
-{% endunless %}}
+pub enum ExecuteMsg {
+    Approve {
+        // release some coins - if quantity is None, release all coins in balance
+        quantity: Option<Vec<Coin>>,
+    },
+    Refund {
+        quantity: Option<Vec<Coin>>,
+    },
+}
+
 
 #[cw_serde]
 #[derive(QueryResponses)]
