@@ -10,16 +10,7 @@ use cosmwasm::serde::{from_slice, to_vec};
 use cosmwasm::storage::Storage;
 use cosmwasm::types::{Coin, CosmosMsg, Params, QueryResponse, RawQuery, Response};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct InitMsg {
-    pub arbiter: String,
-    pub recipient: String,
-    // you can set a last time or block height the contract is valid at
-    // if *either* is non-zero and below current state, the contract is considered expired
-    // and will be returned to the original funder
-    pub end_height: i64,
-    pub end_time: i64,
-}
+
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
