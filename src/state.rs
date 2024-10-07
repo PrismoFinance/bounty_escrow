@@ -32,7 +32,7 @@ pub static CONFIG_KEY: &[u8] = b"config";
 
 pub fn init<T: Storage>(store: &mut T, params: Params, msg: Vec<u8>) -> Result<Response> {
     let msg: InitMsg = from_slice(&msg).context(ParseErr { kind: "InitMsg" })?;
-    let state = State {
+    let config = Config {
         arbiter: msg.arbiter,
         recipient: msg.recipient,
         source: params.message.signer.clone(),
