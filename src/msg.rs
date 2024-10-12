@@ -31,9 +31,25 @@ pub enum ExecuteMsg {
     UpdateEscrow {
     bounty_owner: Option<String>, // This is the Bounty Issuer of the bounty contract. 
     arbiter: Option<String>, 
+    status: EscrowStatus,
     recipient: Option<String>, // This is destinations
     quantity: Uint128, 
-    token_denom: Uint128, 
+    token_denom: Option<Uint128>, 
+    /// Title of the escrow, for example for a bug bounty "Fix issue in contract.rs"
+    title: Option<String>,
+    /// Description of the escrow, a more in depth description of how to meet the escrow condition
+    description: Option<String>,
+    /// When end height set and block height exceeds this value, the escrow is expired.
+    /// Once an escrow is expired, it can be returned to the original funder (via "refund").
+    end_height: Option<u64>,
+    /// When end time (in seconds since epoch 00:00:00 UTC on 1 January 1970) is set and
+    /// block time exceeds this value, the escrow is expired.
+    /// Once an escrow is expired, it can be returned to the original funder (via "refund").
+    end_time: Option<u64>,
+      /// Balance in Native and Cw20 tokens
+    balance: GenericBalance,
+    /// All possible contracts that we accept tokens from
+    cw20_whitelist: Vec<Addr>,
     },
 }
 
