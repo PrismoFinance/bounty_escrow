@@ -16,14 +16,14 @@ pub struct EscrowBounty {
     bounty_owner: Addr, // This is the Bounty Issuer of the bounty contract. 
     arbiter: Addr, 
     recipient: Addr, // This is destinations
-    pay_amount: Uint128, 
+    quantity: Uint128, 
     token_denom: Uint128, 
 }
 
 #[cw_serde] 
 pub enum EscrowStatus {
-    Completed {recipient: Addr, pay_amount: Uint128, token_denom: Uint128},
-    Rejected {bounty_owner: Addr, pay_amount: Uint128, token_denom: Uint128}, 
+    Completed {recipient: Addr, quantity: Uint128, token_denom: Uint128},
+    Rejected {bounty_owner: Addr, quantity: Uint128, token_denom: Uint128}, 
     In Progress {}, 
     Expired {}, 
 }
