@@ -4,8 +4,8 @@ use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Resp
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, {% unless minimal %}GetCountResponse, {% endunless %}InstantiateMsg, QueryMsg};
-use crate::state::{State, STATE};
+use crate::msg::{ExecuteMsg, GetEscrowResponse, GetEscrowRecipient, InstantiateMsg, QueryMsg};
+use crate::state::{config, CONFIG, ESCROW, EscrowBounty, EscrowStatus};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:{{project-name}}";
@@ -39,8 +39,10 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Increment {} => execute::increment(deps),
-        ExecuteMsg::Reset { count } => execute::reset(deps, info, count),
+        ExecuteMsg::UpdateEscrow {} => execute_update_escrow(deps),
+        ExecuteMsg::ApproveEscrow { } => execute_approve_escrow(deps, info, count),
+        ExecuteMsg::RefundEscrow {} => execute_refund_escrow(deps, info, escrow_id),
+        ExecuteMsg::ExpiredEscrow {} => execute_expired_escrow(deps, info, escrow_id),
     }
 }
 
