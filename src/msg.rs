@@ -13,12 +13,20 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    Approve {
+    ApproveEscrow {
         // release some coins - if quantity is None, release all coins in balance
         quantity: Option<Vec<Coin>>,
+        recipient: String,
     },
-    Refund {
+    RefundEscrow {
+        owner: String,
         quantity: Option<Vec<Coin>>,
+    },
+    ExpiredEscrow {
+        owner: String,
+        quantity: Option<Vec<Coin>>,
+        end_height: i64,
+        end_time: i64,
     },
 }
 
