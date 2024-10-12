@@ -29,6 +29,8 @@ pub enum QueryMsg {
     // GetCount returns the current count as a json-encoded number
     #[returns(GetEscrowResponse)]
     GetEscrow {escrow_id},
+    #[returns(GetEscrowRecipient)]
+    GetRecipient {recipient},
 }
 
 // We define a custom struct for each query response
@@ -38,5 +40,10 @@ pub struct GetEscrowResponse {
     pub destinations: Destination, // Who will receive the funds in escrow? 1) Rejection --> Bounty Issuer 2) Acceptance --> Bounty Assignee
     pub arbiter: String, 
     pub pay_amount: Uint128, 
+}
+
+#[cw_serde]
+pub struct GetEscrowRecipient {
+    pub recipient: String,
 }
 
