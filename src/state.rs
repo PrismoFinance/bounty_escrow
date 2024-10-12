@@ -70,6 +70,14 @@ pub struct EscrowBounty {
     pub cw20_whitelist: Vec<Addr>,
 }
 
+#[cw_serde] 
+pub enum EscrowStatus {
+    Completed {recipient: Addr, quantity: Uint128, token_denom: Uint128},
+    Rejected {bounty_owner: Addr, quantity: Uint128, token_denom: Uint128}, 
+    In Progress {}, 
+    Expired {}, 
+}
+
 impl EscrowBounty {
     pub fn is_expired(&self, env: &Env) -> bool {
         if let Some(end_height) = self.end_height {
@@ -99,37 +107,5 @@ pub fn all_escrow_ids(storage: &dyn Storage) -> StdResult<Vec<String>> {
     ESCROWS
         .keys(storage, None, None, Order::Ascending)
         .collect()
-}
-
-#[cw_serde]
-pub struct EscrowBounty {
-    bounty_owner: Addr, // This is the Bounty Issuer of the bounty contract. 
-    arbiter: Addr, 
-    recipient: Addr, // This is destinations
-    quantity: Uint128, 
-    token_denom: Uint128, 
-    /// Title of the escrow, for example for a bug bounty "Fix issue in contract.rs"
-    pub title: String,
-    /// Description of the escrow, a more in depth description of how to meet the escrow condition
-    pub description: String,
-    /// When end height set and block height exceeds this value, the escrow is expired.
-    /// Once an escrow is expired, it can be returned to the original funder (via "refund").
-    pub end_height: Option<u64>,
-    /// When end time (in seconds since epoch 00:00:00 UTC on 1 January 1970) is set and
-    /// block time exceeds this value, the escrow is expired.
-    /// Once an escrow is expired, it can be returned to the original funder (via "refund").
-    pub end_time: Option<u64>,
-      /// Balance in Native and Cw20 tokens
-    pub balance: GenericBalance,
-    /// All possible contracts that we accept tokens from
-    pub cw20_whitelist: Vec<Addr>,
-}
-
-#[cw_serde] 
-pub enum EscrowStatus {
-    Completed {recipient: Addr, quantity: Uint128, token_denom: Uint128},
-    Rejected {bounty_owner: Addr, quantity: Uint128, token_denom: Uint128}, 
-    In Progress {}, 
-    Expired {}, 
 }
 
