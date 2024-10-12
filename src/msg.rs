@@ -28,6 +28,13 @@ pub enum ExecuteMsg {
         end_height: i64,
         end_time: i64,
     },
+    UpdateEscrow {
+    bounty_owner: Option<String>, // This is the Bounty Issuer of the bounty contract. 
+    arbiter: Option<String>, 
+    recipient: Option<String>, // This is destinations
+    quantity: Uint128, 
+    token_denom: Uint128, 
+    },
 }
 
 
