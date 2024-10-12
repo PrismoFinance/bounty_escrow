@@ -52,7 +52,7 @@ pub enum QueryMsg {
 #[cw_serde]
 pub struct GetEscrowResponse {
     pub status: BountyStatus, // This will be the bounty status
-    pub destinations: Destination, // Who will receive the funds in escrow? 1) Rejection --> Bounty Issuer 2) Acceptance --> Bounty Assignee
+    pub recipient: String, // Who will receive the funds in escrow? 1) Rejection --> Bounty Issuer 2) Acceptance --> Bounty Assignee
     pub arbiter: String, 
     pub pay_amount: Uint128, 
 }
