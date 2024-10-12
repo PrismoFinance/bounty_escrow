@@ -101,6 +101,7 @@ impl EscrowBounty {
 }
 
 pub const ESCROWS: Map<&str, Escrow> = Map::new("escrow");
+// pub const CONFIG
 
 /// This returns the list of ids for all registered escrows
 pub fn all_escrow_ids(storage: &dyn Storage) -> StdResult<Vec<String>> {
