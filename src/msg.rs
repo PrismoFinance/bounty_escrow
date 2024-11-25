@@ -17,16 +17,19 @@ pub enum ExecuteMsg {
         // release some coins - if quantity is None, release all coins in balance
         quantity: Option<Vec<Coin>>,
         recipient: String,
+        balance: GenericBalance, 
     },
     RefundEscrow {
         owner: String,
         quantity: Option<Vec<Coin>>,
+        balance: GenericBalance,
     },
     ExpiredEscrow {
         owner: String,
         quantity: Option<Vec<Coin>>,
         end_height: i64,
         end_time: i64,
+        balance: GenericBalance, 
     },
     UpdateEscrow {
     bounty_owner: Option<String>, // This is the Bounty Issuer of the bounty contract. 
