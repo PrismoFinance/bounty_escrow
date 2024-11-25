@@ -18,7 +18,7 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    let config = Config {
+    let escrow = BountyEscrow {
         count: msg.count,
         owner: info.sender.clone(),
     };
