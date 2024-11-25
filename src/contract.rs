@@ -19,16 +19,41 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     let escrow = BountyEscrow {
-        count: msg.count,
-        owner: info.sender.clone(),
+    bounty_owner: info.sender.clone(), // This is the Bounty Issuer of the bounty contract. 
+    arbiter: msg.arbiter, 
+    status: msg.status,
+    recipient: msg.recipient, // This is destinations
+    quantity: msg.quantity, 
+    token_denom: msg.token_denom, 
+    /// Title of the escrow, for example for a bug bounty "Fix issue in contract.rs"
+    title: msg.title,
+    /// Description of the escrow, a more in depth description of how to meet the escrow condition
+    description: msg.description,
+    /// When end height set and block height exceeds this value, the escrow is expired.
+    /// Once an escrow is expired, it can be returned to the original funder (via "refund").
+    end_height: msg.end_height,
+    /// When end time (in seconds since epoch 00:00:00 UTC on 1 January 1970) is set and
+    /// block time exceeds this value, the escrow is expired.
+    /// Once an escrow is expired, it can be returned to the original funder (via "refund").
+    end_time: msg.end_time,
+      /// Balance in Native and Cw20 tokens
+    balance: msg.balance,
+    /// All possible contracts that we accept tokens from
+    cw20_whitelist: msg.cw20_whitelist,
     };
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    CONFIG.save(deps.storage, &state)?;
+    ESCROW.save(deps.storage, &escrow)?;
 
     Ok(Response::new()
         .add_attribute("method", "instantiate")
-        .add_attribute("owner", info.sender)
-        .add_attribute("count", msg.count.to_string()))
+        .add_attribute("bount_owner", info.sender)
+        .add_attribute("recipient", msg.recipient.to_string())
+        .add_attribute("balance", msg.balance.to_string())
+        .add_attribute("title", msg.title.to_string())
+        .add_attribute("description", msg.description.to_string())
+        .add_attribute("quantity", msg.quantity.to_string())
+        .add_attribute("statu", msg.status.to_string()))
+        
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
