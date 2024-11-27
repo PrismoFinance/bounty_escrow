@@ -37,24 +37,6 @@ pub enum BountyStatus {
     Completed,
     Expired,
 }
-
-impl Bounty {
-    /// Check if the bounty has expired
-    pub fn is_expired(&self, env_block_height: u64, env_block_time: Timestamp) -> bool {
-        if let Some(end_height) = self.end_height {
-            if env_block_height > end_height {
-                return true;
-            }
-        }
-        if let Some(end_time) = self.end_time {
-            if env_block_time > end_time {
-                return true;
-            }
-        }
-        false
-    }
-}
-
 /// Map to store all bounties
 pub const BOUNTIES: Map<u64, Bounty> = Map::new("bounties");
 
