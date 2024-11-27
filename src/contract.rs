@@ -1,11 +1,11 @@
-#[cfg(not(feature = "library"))]
-use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{
+    entry_point, to_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Timestamp,
+};
 use cw2::set_contract_version;
-
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, GetEscrowResponse, GetEscrowRecipient, InstantiateMsg, QueryMsg};
-use crate::state::{config, CONFIG, ESCROW, EscrowBounty, EscrowStatus};
+use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::state::{Bounty, BOUNTIES, NEXT_BOUNTY_ID, BountyStatus};
+
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:{{project-name}}";
