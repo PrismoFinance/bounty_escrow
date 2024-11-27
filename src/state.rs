@@ -45,6 +45,8 @@ impl GenericBalance {
     }
 }
 
+
+// Bounty Issuer will act as the Arbiter
 #[cw_serde]
 pub struct Bounty {
     pub title: String,
@@ -60,14 +62,14 @@ pub struct Bounty {
 }
 
 #[cw_serde] 
-pub enum EscrowStatus {
-    Completed {recipient: Addr, quantity: Uint128, token_denom: Uint128},
-    Rejected {bounty_owner: Addr, quantity: Uint128, token_denom: Uint128}, 
-    In Progress {}, 
-    Expired {}, 
+pub enum BountyStatus {
+    Open,
+    InProgress,
+    Completed,
+    Expired,
 }
 
-impl EscrowBounty {
+impl Bounty {
     pub fn is_expired(&self, env: &Env) -> bool {
         if let Some(end_height) = self.end_height {
             if env.block.height > end_height {
@@ -89,22 +91,22 @@ impl EscrowBounty {
     }
 }
 
-pub const ESCROW: Map<&str, Escrow> = Map::new("escrow");
+pub const BOUNTIES: Map<&str, Bounty> = Map::new("bounties");
 
 // Function to return the escrow_id of a specific escrow based on owner
-pub fn escrow_id_by_owner(
+pub fn bounty_id_by_owner(
     storage: &dyn Storage,
     owner: &Addr,            // Updated to search by 'owner'
 ) -> StdResult<String> {
-    let escrow_id: Vec<String> = ESCROW
+    let bounty_id: Vec<String> = BOUNTIES
         .keys(storage, None, None, cosmwasm_std::Order::Ascending)
         .collect::<StdResult<Vec<_>>>()?;
 
     // Search for the escrow created by the given owner
-    for id in escrow_id {
-        let escrow = ESCROW.load(storage, &escrow_id)?;
-        if &escrow.owner == owner { // Updated from 'creator' to 'owner'
-            return Ok(escrow_id); // Return the id of the escrow created by this owner
+    for id in bounty_id {
+        let bounty = BOUNTIES.load(storage, &bounty_id)?;
+        if &bounty.owner == owner { // Updated from 'creator' to 'owner'
+            return Ok(bounty_id); // Return the id of the escrow created by this owner
         }
     }
 
