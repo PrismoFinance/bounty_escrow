@@ -26,18 +26,16 @@ pub fn instantiate(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::UpdateEscrow {} => execute_update_escrow(deps),
-        ExecuteMsg::ApproveEscrow { } => execute_approve_escrow(deps, info, count),
-        ExecuteMsg::RefundEscrow {} => execute_refund_escrow(deps, info, escrow_id),
-        ExecuteMsg::ExpiredEscrow {} => execute_expired_escrow(deps, info, escrow_id),
+        ExecuteMsg::CreateBounty(msg) => execute_create_bounty(deps, env, info, msg),
+        ExecuteMsg::FinalizeBounty(msg) => execute_finalize_bounty(deps, env, info, msg),
+        ExecuteMsg::ExpireBounty(msg) => execute_expire_bounty(deps, env, info, msg),
     }
 }
-
 pub mod execute {
     use super::*;
 // Place functions here
