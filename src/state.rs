@@ -46,28 +46,17 @@ impl GenericBalance {
 }
 
 #[cw_serde]
-pub struct EscrowBounty {
-    pub bounty_owner: Addr, // This is the Bounty Issuer of the bounty contract. 
-    pub arbiter: Addr, 
-    pub status: EscrowStatus,
-    pub recipient: Addr, // This is destinations
-    pub quantity: Uint128, 
-    pub token_denom: Uint128, 
-    /// Title of the escrow, for example for a bug bounty "Fix issue in contract.rs"
+pub struct Bounty {
     pub title: String,
-    /// Description of the escrow, a more in depth description of how to meet the escrow condition
     pub description: String,
-    /// When end height set and block height exceeds this value, the escrow is expired.
-    /// Once an escrow is expired, it can be returned to the original funder (via "refund").
+    pub status: BountyStatus,
+    pub issuer: Addr,
+    pub recipient: Option<Addr>,
     pub end_height: Option<u64>,
-    /// When end time (in seconds since epoch 00:00:00 UTC on 1 January 1970) is set and
-    /// block time exceeds this value, the escrow is expired.
-    /// Once an escrow is expired, it can be returned to the original funder (via "refund").
-    pub end_time: Option<u64>,
-      /// Balance in Native and Cw20 tokens
-    pub balance: GenericBalance,
-    /// All possible contracts that we accept tokens from
-    pub cw20_whitelist: Vec<Addr>,
+    pub end_time: Option<Timestamp>,
+    pub token_denom: String,
+    pub quantity: Uint128,
+    pub balance: Uint128,
 }
 
 #[cw_serde] 
