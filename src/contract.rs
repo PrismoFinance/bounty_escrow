@@ -216,6 +216,19 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetBounty { bounty_id } => to_binary(&query_bounty(deps, bounty_id)?),
         QueryMsg::ListBounties {} => to_binary(&query_all_bounties(deps)?),
     }
+
+    pub fn query_bounty(deps: Deps, bounty_id: u64) -> StdResult<Bounty> {
+    let bounty = BOUNTIES.load(deps.storage, bounty_id)?;
+    Ok(bounty)
+}
+
+pub fn query_all_bounties(deps: Deps) -> StdResult<Vec<Bounty>> {
+    BOUNTIES
+        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
+        .map(|item| item.map(|(_, bounty)| bounty))
+        .collect()
+}
+    
 }
 
 
