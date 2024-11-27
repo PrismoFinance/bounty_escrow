@@ -10,43 +10,11 @@ use cosmwasm::serde::{from_slice, to_vec};
 use cosmwasm::storage::Storage;
 use cosmwasm::types::{Coin, CosmosMsg, Params, QueryResponse, RawQuery, Response};
 
-impl GenericBalance {
-    pub fn add_tokens(&mut self, add: Balance) {
-        match add {
-            Balance::Native(balance) => {
-                for token in balance.0 {
-                    let index = self.native.iter().enumerate().find_map(|(i, exist)| {
-                        if exist.denom == token.denom {
-                            Some(i)
-                        } else {
-                            None
-                        }
-                    });
-                    match index {
-                        Some(idx) => self.native[idx].amount += token.amount,
-                        None => self.native.push(token),
-                    }
-                }
-            }
-            Balance::Cw20(token) => {
-                let index = self.cw20.iter().enumerate().find_map(|(i, exist)| {
-                    if exist.address == token.address {
-                        Some(i)
-                    } else {
-                        None
-                    }
-                });
-                match index {
-                    Some(idx) => self.cw20[idx].amount += token.amount,
-                    None => self.cw20.push(token),
-                }
-            }
-        };
-    }
-}
+use cosmwasm_schema::cw_serde;
+use cosmwasm_std::{Addr, Storage, StdResult, Timestamp, Uint128};
+use cw_storage_plus::{Item, Map};
 
-
-// Bounty Issuer will act as the Arbiter
+/// Represents a bounty
 #[cw_serde]
 pub struct Bounty {
     pub title: String,
@@ -61,7 +29,8 @@ pub struct Bounty {
     pub balance: Uint128,
 }
 
-#[cw_serde] 
+/// Status of the bounty
+#[cw_serde]
 pub enum BountyStatus {
     Open,
     InProgress,
@@ -70,44 +39,42 @@ pub enum BountyStatus {
 }
 
 impl Bounty {
-    pub fn is_expired(&self, env: &Env) -> bool {
+    /// Check if the bounty has expired
+    pub fn is_expired(&self, env_block_height: u64, env_block_time: Timestamp) -> bool {
         if let Some(end_height) = self.end_height {
-            if env.block.height > end_height {
+            if env_block_height > end_height {
                 return true;
             }
         }
-
         if let Some(end_time) = self.end_time {
-            if env.block.time > Timestamp::from_seconds(end_time) {
+            if env_block_time > end_time {
                 return true;
             }
         }
-
         false
-    }
-
-    pub fn human_whitelist(&self) -> Vec<String> {
-        self.cw20_whitelist.iter().map(|a| a.to_string()).collect()
     }
 }
 
-pub const BOUNTIES: Map<&str, Bounty> = Map::new("bounties");
+/// Map to store all bounties
+pub const BOUNTIES: Map<u64, Bounty> = Map::new("bounties");
 
-// Function to return the escrow_id of a specific escrow based on owner
+/// Item to track the next bounty ID
+pub const NEXT_BOUNTY_ID: Item<u64> = Item::new("next_bounty_id");
+
+/// Function to return the bounty ID of a specific bounty based on the owner
 pub fn bounty_id_by_owner(
     storage: &dyn Storage,
-    owner: &Addr,            // Updated to search by 'owner'
-) -> StdResult<String> {
-    let bounty_id: Vec<String> = BOUNTIES
-        .keys(storage, None, None, cosmwasm_std::Order::Ascending)
-        .collect::<StdResult<Vec<_>>>()?;
+    owner: &Addr,
+) -> StdResult<Option<u64>> {
+    let mut bounty_ids = BOUNTIES.keys(storage, None, None, cosmwasm_std::Order::Ascending);
 
-    // Search for the escrow created by the given owner
-    for id in bounty_id {
-        let bounty = BOUNTIES.load(storage, &bounty_id)?;
-        if &bounty.owner == owner { // Updated from 'creator' to 'owner'
-            return Ok(bounty_id); // Return the id of the escrow created by this owner
+    while let Some(id) = bounty_ids.next() {
+        let bounty_id = id?;
+        let bounty = BOUNTIES.load(storage, bounty_id)?;
+        if &bounty.issuer == owner {
+            return Ok(Some(bounty_id));
         }
     }
 
-
+    Ok(None)
+}
