@@ -57,6 +57,10 @@ pub mod execute {
         return Err(ContractError::InsufficientFunds {});
     }
 
+    if info.funds.is_empty() || info.funds[0].denom != msg.token_denom {
+    return Err(ContractError::InvalidFunds {});
+}
+
     // Create the bounty
     let bounty = Bounty {
         title: msg.title,
