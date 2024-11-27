@@ -1,11 +1,14 @@
+#[cfg(not(feature = "library"))]
+use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    entry_point, to_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, StdError, StdResult, Timestamp,
+    to_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, StdError,
+    StdResult, Timestamp,
 };
 use cw2::set_contract_version;
+
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{Bounty, BOUNTIES, NEXT_BOUNTY_ID, BountyStatus};
-
+use crate::state::{Bounty, BountyStatus, BOUNTIES, NEXT_BOUNTY_ID};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:{{project-name}}";
@@ -16,14 +19,11 @@ pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    msg: InstantiateMsg,
+    _msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    NEXT_BOUNTY_ID.save(deps.storage, &msg.start_bounty_id)?;
-    Ok(Response::new()
-        .add_attribute("method", "instantiate")
-        .add_attribute("bounty_owner", info.sender))
+    NEXT_BOUNTY_ID.save(deps.storage, &1u64)?; // Initialize ID counter
+    Ok(Response::new().add_attribute("method", "instantiate").add_attribute("bounty_owner", info.sender))
 }
-
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
@@ -38,30 +38,23 @@ pub fn execute(
         ExecuteMsg::ExpireBounty(msg) => execute_expire_bounty(deps, env, info, msg),
     }
 }
-pub mod execute {
-    use super::*;
-// Place functions herepub fn create_bounty(
+
+/// Create a bounty
+pub fn execute_create_bounty(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: CreateBountyMsg,
 ) -> Result<Response, ContractError> {
-    // Get the next bounty ID
     let id = NEXT_BOUNTY_ID.load(deps.storage)?;
 
-    // Validate that the funds sent match the bounty requirements
-    if info.funds.len() != 1 || info.funds[0].denom != msg.token_denom {
+    if info.funds.is_empty() || info.funds[0].denom != msg.token_denom {
         return Err(ContractError::InvalidFunds {});
     }
     if info.funds[0].amount < msg.quantity {
         return Err(ContractError::InsufficientFunds {});
     }
 
-    if info.funds.is_empty() || info.funds[0].denom != msg.token_denom {
-    return Err(ContractError::InvalidFunds {});
-}
-
-    // Create the bounty
     let bounty = Bounty {
         title: msg.title,
         description: msg.description,
@@ -75,10 +68,7 @@ pub mod execute {
         balance: info.funds[0].amount,
     };
 
-    // Save the bounty in storage
     BOUNTIES.save(deps.storage, id, &bounty)?;
-
-    // Increment the next bounty ID
     NEXT_BOUNTY_ID.save(deps.storage, &(id + 1))?;
 
     Ok(Response::new()
@@ -87,42 +77,27 @@ pub mod execute {
         .add_attribute("issuer", info.sender.to_string()))
 }
 
-
-        pub fn finalize_bounty(
+/// Finalize a bounty
+pub fn execute_finalize_bounty(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: FinalizeBountyMsg,
 ) -> Result<Response, ContractError> {
-    // Load the bounty
     let mut bounty = BOUNTIES.load(deps.storage, msg.bounty_id)?;
 
-    // Ensure the caller is the bounty issuer
     if info.sender != bounty.issuer {
         return Err(ContractError::Unauthorized {});
     }
 
-    // Check if the bounty has expired
-    if let Some(end_height) = bounty.end_height {
-        if env.block.height > end_height {
-            bounty.status = BountyStatus::Expired;
-        }
-    }
-    if let Some(end_time) = bounty.end_time {
-        if env.block.time > end_time {
-            bounty.status = BountyStatus::Expired;
-        }
+    if check_expired(&bounty, &env) {
+        bounty.status = BountyStatus::Expired;
     }
 
-    // Handle completion or failure
     if msg.success {
-        // Ensure a recipient is set
         let recipient = bounty.recipient.ok_or(ContractError::RecipientNotSet {})?;
-
-        // Mark bounty as completed
         bounty.status = BountyStatus::Completed;
 
-        // Create a bank message to transfer funds to the recipient
         let payment = BankMsg::Send {
             to_address: recipient.to_string(),
             amount: vec![Coin {
@@ -139,7 +114,6 @@ pub mod execute {
             .add_attribute("bounty_id", msg.bounty_id.to_string())
             .add_attribute("status", "completed"))
     } else {
-        // Mark bounty as expired and refund the issuer
         bounty.status = BountyStatus::Expired;
 
         let refund = BankMsg::Send {
@@ -160,36 +134,25 @@ pub mod execute {
     }
 }
 
-pub fn expire_bounty(
+/// Expire a bounty
+pub fn execute_expire_bounty(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     msg: ExpireBountyMsg,
 ) -> Result<Response, ContractError> {
-    // Load the bounty
     let mut bounty = BOUNTIES.load(deps.storage, msg.bounty_id)?;
 
-    // Ensure the caller is the bounty issuer
     if info.sender != bounty.issuer {
         return Err(ContractError::Unauthorized {});
     }
 
-    // Check if the bounty has already expired
-    if let Some(end_height) = bounty.end_height {
-        if env.block.height <= end_height {
-            return Err(ContractError::NotYetExpired {});
-        }
-    }
-    if let Some(end_time) = bounty.end_time {
-        if env.block.time <= end_time {
-            return Err(ContractError::NotYetExpired {});
-        }
+    if !check_expired(&bounty, &env) {
+        return Err(ContractError::NotYetExpired {});
     }
 
-    // Mark the bounty as expired
     bounty.status = BountyStatus::Expired;
 
-    // Refund the funds to the issuer
     let refund = BankMsg::Send {
         to_address: bounty.issuer.to_string(),
         amount: vec![Coin {
@@ -207,34 +170,13 @@ pub fn expire_bounty(
         .add_attribute("status", "expired"))
 }
 
-        
-}
-
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetBounty { bounty_id } => to_binary(&query_bounty(deps, bounty_id)?),
         QueryMsg::ListBounties {} => to_binary(&query_all_bounties(deps)?),
     }
-
-    pub fn query_bounty(deps: Deps, bounty_id: u64) -> StdResult<Bounty> {
-    let bounty = BOUNTIES.load(deps.storage, bounty_id)?;
-    Ok(bounty)
 }
-
-pub fn query_all_bounties(deps: Deps) -> StdResult<Vec<Bounty>> {
-    BOUNTIES
-        .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-        .map(|item| item.map(|(_, bounty)| bounty))
-        .collect()
-}
-    
-}
-
-
-
-
-
 
 
 
