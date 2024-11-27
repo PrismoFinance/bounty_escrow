@@ -42,21 +42,34 @@ pub mod execute {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetCount {} => to_json_binary(&query::count(deps)?),
-    }{
-}
-
-pub mod query {
-    use super::*;
-
-    pub fn count(deps: Deps) -> StdResult<GetCountResponse> {
-        let state = STATE.load(deps.storage)?;
-        Ok(GetCountResponse { count: state.count })
+        QueryMsg::GetBounty { bounty_id } => to_binary(&query_bounty(deps, bounty_id)?),
+        QueryMsg::ListBounties {} => to_binary(&query_all_bounties(deps)?),
     }
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Ignore for now
 #[cfg(test)]
 mod tests {
     use super::*;
