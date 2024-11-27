@@ -191,89 +191,200 @@ pub fn query_all_bounties(deps: Deps) -> StdResult<Vec<Bounty>> {
 
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Ignore for now
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_json};
+    use cosmwasm_std::{
+        coins, from_binary, testing::{mock_dependencies, mock_env, mock_info}, Addr, Uint128,
+    };
+    use crate::msg::{CreateBountyMsg, ExecuteMsg, InstantiateMsg, QueryMsg};
+    use crate::state::{BountyStatus, BOUNTIES, NEXT_BOUNTY_ID};
 
-    #[test]
-    fn proper_initialization() {
+    /// Helper function to create a test environment with initialized state
+    fn setup_contract() -> (DepsMut, Env, MessageInfo) {
         let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = mock_info("creator", &coins(1000, "token"));
 
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(1000, "earth"));
+        // Instantiate the contract
+        let msg = InstantiateMsg {};
+        let _res = instantiate(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
 
-        // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: GetCountResponse = from_json(&res).unwrap();
-        assert_eq!(17, value.count);
-    }
-
-    #[test]
-    fn increment() {
-        let mut deps = mock_dependencies();
-
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(2, "token"));
-        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-        // beneficiary can release it
-        let info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Increment {};
-        let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-        // should increase counter by 1
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: GetCountResponse = from_json(&res).unwrap();
-        assert_eq!(18, value.count);
-    }
-
-    #[test]
-    fn reset() {
-        let mut deps = mock_dependencies();
-
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(2, "token"));
-        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-        // beneficiary can release it
-        let unauth_info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Reset { count: 5 };
-        let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
-        match res {
-            Err(ContractError::Unauthorized {}) => {}
-            _ => panic!("Must return unauthorized error"),
-        }
-
-        // only the original creator can reset the counter
-        let auth_info = mock_info("creator", &coins(2, "token"));
-        let msg = ExecuteMsg::Reset { count: 5 };
-        let _res = execute(deps.as_mut(), mock_env(), auth_info, msg).unwrap();
-
-        // should now be 5
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: GetCountResponse = from_json(&res).unwrap();
-        assert_eq!(5, value.count);
+        (deps.as_mut(), env, info)
     }
 }
+
+#[test]
+fn test_instantiate() {
+    let mut deps = mock_dependencies();
+    let env = mock_env();
+    let info = mock_info("creator", &[]); // No funds required for instantiation
+
+    let msg = InstantiateMsg {};
+    let res = instantiate(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+    assert_eq!(res.attributes, vec![
+        ("method", "instantiate"),
+        ("bount_owner", "creator"),
+    ]);
+
+    // Ensure the NEXT_BOUNTY_ID is initialized to 1
+    let id = NEXT_BOUNTY_ID.load(deps.as_ref().storage).unwrap();
+    assert_eq!(id, 1u64);
+}
+
+#[test]
+fn test_create_bounty() {
+    let (deps, env, info) = setup_contract();
+
+    let create_msg = ExecuteMsg::CreateBounty(CreateBountyMsg {
+        title: "Fix a bug".to_string(),
+        description: "Fix a critical bug in the system".to_string(),
+        recipient: Some("developer".to_string()),
+        end_height: Some(env.block.height + 100),
+        end_time: None,
+        token_denom: "token".to_string(),
+        quantity: Uint128::new(500),
+    });
+
+    // Simulate sending the required funds
+    let info = mock_info("creator", &coins(500, "token"));
+    let res = execute(deps, env.clone(), info.clone(), create_msg).unwrap();
+
+    assert_eq!(res.attributes, vec![
+        ("action", "create_bounty"),
+        ("bounty_id", "1"),
+        ("issuer", "creator"),
+    ]);
+
+    // Verify the bounty is stored correctly
+    let bounty = BOUNTIES.load(deps.storage, 1).unwrap();
+    assert_eq!(bounty.title, "Fix a bug");
+    assert_eq!(bounty.description, "Fix a critical bug in the system");
+    assert_eq!(bounty.recipient.unwrap(), Addr::unchecked("developer"));
+    assert_eq!(bounty.balance, Uint128::new(500));
+    assert_eq!(bounty.status, BountyStatus::Open);
+}
+#[test]
+fn test_finalize_bounty_success() {
+    let (deps, env, info) = setup_contract();
+
+    // Create a bounty first
+    let create_msg = ExecuteMsg::CreateBounty(CreateBountyMsg {
+        title: "Fix a bug".to_string(),
+        description: "Fix a critical bug in the system".to_string(),
+        recipient: Some("developer".to_string()),
+        end_height: Some(env.block.height + 100),
+        end_time: None,
+        token_denom: "token".to_string(),
+        quantity: Uint128::new(500),
+    });
+    let info = mock_info("creator", &coins(500, "token"));
+    execute(deps, env.clone(), info.clone(), create_msg).unwrap();
+
+    // Finalize the bounty successfully
+    let finalize_msg = ExecuteMsg::FinalizeBounty(FinalizeBountyMsg {
+        bounty_id: 1,
+        success: true,
+    });
+
+    let info = mock_info("creator", &[]);
+    let res = execute(deps, env.clone(), info, finalize_msg).unwrap();
+
+    assert_eq!(res.attributes, vec![
+        ("action", "finalize_bounty"),
+        ("bounty_id", "1"),
+        ("status", "completed"),
+    ]);
+
+    // Verify the bounty status
+    let bounty = BOUNTIES.load(deps.storage, 1).unwrap();
+    assert_eq!(bounty.status, BountyStatus::Completed);
+}
+#[test]
+fn test_expire_bounty() {
+    let (deps, env, info) = setup_contract();
+
+    // Create a bounty
+    let create_msg = ExecuteMsg::CreateBounty(CreateBountyMsg {
+        title: "Write documentation".to_string(),
+        description: "Write detailed docs for the project".to_string(),
+        recipient: None,
+        end_height: Some(env.block.height + 1), // Immediate expiration
+        end_time: None,
+        token_denom: "token".to_string(),
+        quantity: Uint128::new(300),
+    });
+    let info = mock_info("creator", &coins(300, "token"));
+    execute(deps, env.clone(), info.clone(), create_msg).unwrap();
+
+    // Advance the block height to simulate expiration
+    let mut env = env.clone();
+    env.block.height += 10;
+
+    let expire_msg = ExecuteMsg::ExpireBounty(ExpireBountyMsg { bounty_id: 1 });
+    let info = mock_info("creator", &[]);
+    let res = execute(deps, env, info, expire_msg).unwrap();
+
+    assert_eq!(res.attributes, vec![
+        ("action", "expire_bounty"),
+        ("bounty_id", "1"),
+        ("status", "expired"),
+    ]);
+
+    // Verify the bounty status
+    let bounty = BOUNTIES.load(deps.storage, 1).unwrap();
+    assert_eq!(bounty.status, BountyStatus::Expired);
+}
+#[test]
+fn test_query_all_bounties() {
+    let (deps, env, info) = setup_contract();
+
+    // Create multiple bounties
+    for i in 1..=3 {
+        let create_msg = ExecuteMsg::CreateBounty(CreateBountyMsg {
+            title: format!("Bounty {}", i),
+            description: "Do something important".to_string(),
+            recipient: None,
+            end_height: None,
+            end_time: None,
+            token_denom: "token".to_string(),
+            quantity: Uint128::new(100 * i),
+        });
+        let info = mock_info("creator", &coins(100 * i, "token"));
+        execute(deps, env.clone(), info.clone(), create_msg).unwrap();
+    }
+
+    let res = query(deps.as_ref(), env, QueryMsg::ListBounties {}).unwrap();
+    let bounties: Vec<Bounty> = from_binary(&res).unwrap();
+
+    assert_eq!(bounties.len(), 3);
+    assert_eq!(bounties[0].title, "Bounty 1");
+    assert_eq!(bounties[1].title, "Bounty 2");
+    assert_eq!(bounties[2].title, "Bounty 3");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
