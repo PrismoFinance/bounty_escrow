@@ -74,6 +74,30 @@ pub fn bounty_id_by_owner(
         if &bounty.issuer == owner {
             return Ok(Some(bounty_id));
         }
+
+/// Helper to check if a bounty is expired
+pub fn check_expired(bounty: &Bounty, env: &Env) -> bool {
+    if let Some(end_height) = bounty.end_height {
+        if env.block.height > end_height {
+            return true;
+        }
+    }
+    if let Some(end_time) = bounty.end_time {
+        if env.block.time > end_time {
+            return true;
+        }
+    }
+    false
+}
+
+/// Helper to validate the bounty status
+pub fn ensure_bounty_open(bounty: &Bounty) -> StdResult<()> {
+    if bounty.status != BountyStatus::Open {
+        Err(StdError::generic_err("Bounty is not open"))
+    } else {
+        Ok(())
+    }
+}
     }
 
     Ok(None)
