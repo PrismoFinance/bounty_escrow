@@ -16,12 +16,14 @@ pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    _msg: InstantiateMsg,
+    msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    NEXT_BOUNTY_ID.save(deps.storage, &1u64)?; // Initialize ID counter
-    Ok(Response::new().add_attribute("method", "instantiate")
-                      .add_attribute("bount_owner", info.sender))
+    NEXT_BOUNTY_ID.save(deps.storage, &msg.start_bounty_id)?;
+    Ok(Response::new()
+        .add_attribute("method", "instantiate")
+        .add_attribute("bounty_owner", info.sender))
 }
+
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
