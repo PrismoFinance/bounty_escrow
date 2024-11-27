@@ -38,7 +38,170 @@ pub fn execute(
 }
 pub mod execute {
     use super::*;
-// Place functions here
+// Place functions herepub fn create_bounty(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: CreateBountyMsg,
+) -> Result<Response, ContractError> {
+    // Get the next bounty ID
+    let id = NEXT_BOUNTY_ID.load(deps.storage)?;
+
+    // Validate that the funds sent match the bounty requirements
+    if info.funds.len() != 1 || info.funds[0].denom != msg.token_denom {
+        return Err(ContractError::InvalidFunds {});
+    }
+    if info.funds[0].amount < msg.quantity {
+        return Err(ContractError::InsufficientFunds {});
+    }
+
+    // Create the bounty
+    let bounty = Bounty {
+        title: msg.title,
+        description: msg.description,
+        status: BountyStatus::Open,
+        issuer: info.sender.clone(),
+        recipient: msg.recipient.map(|r| deps.api.addr_validate(&r)).transpose()?,
+        end_height: msg.end_height,
+        end_time: msg.end_time,
+        token_denom: msg.token_denom,
+        quantity: msg.quantity,
+        balance: info.funds[0].amount,
+    };
+
+    // Save the bounty in storage
+    BOUNTIES.save(deps.storage, id, &bounty)?;
+
+    // Increment the next bounty ID
+    NEXT_BOUNTY_ID.save(deps.storage, &(id + 1))?;
+
+    Ok(Response::new()
+        .add_attribute("action", "create_bounty")
+        .add_attribute("bounty_id", id.to_string())
+        .add_attribute("issuer", info.sender.to_string()))
+}
+
+
+        pub fn finalize_bounty(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: FinalizeBountyMsg,
+) -> Result<Response, ContractError> {
+    // Load the bounty
+    let mut bounty = BOUNTIES.load(deps.storage, msg.bounty_id)?;
+
+    // Ensure the caller is the bounty issuer
+    if info.sender != bounty.issuer {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // Check if the bounty has expired
+    if let Some(end_height) = bounty.end_height {
+        if env.block.height > end_height {
+            bounty.status = BountyStatus::Expired;
+        }
+    }
+    if let Some(end_time) = bounty.end_time {
+        if env.block.time > end_time {
+            bounty.status = BountyStatus::Expired;
+        }
+    }
+
+    // Handle completion or failure
+    if msg.success {
+        // Ensure a recipient is set
+        let recipient = bounty.recipient.ok_or(ContractError::RecipientNotSet {})?;
+
+        // Mark bounty as completed
+        bounty.status = BountyStatus::Completed;
+
+        // Create a bank message to transfer funds to the recipient
+        let payment = BankMsg::Send {
+            to_address: recipient.to_string(),
+            amount: vec![Coin {
+                denom: bounty.token_denom.clone(),
+                amount: bounty.balance,
+            }],
+        };
+
+        BOUNTIES.save(deps.storage, msg.bounty_id, &bounty)?;
+
+        Ok(Response::new()
+            .add_message(payment)
+            .add_attribute("action", "finalize_bounty")
+            .add_attribute("bounty_id", msg.bounty_id.to_string())
+            .add_attribute("status", "completed"))
+    } else {
+        // Mark bounty as expired and refund the issuer
+        bounty.status = BountyStatus::Expired;
+
+        let refund = BankMsg::Send {
+            to_address: bounty.issuer.to_string(),
+            amount: vec![Coin {
+                denom: bounty.token_denom.clone(),
+                amount: bounty.balance,
+            }],
+        };
+
+        BOUNTIES.save(deps.storage, msg.bounty_id, &bounty)?;
+
+        Ok(Response::new()
+            .add_message(refund)
+            .add_attribute("action", "finalize_bounty")
+            .add_attribute("bounty_id", msg.bounty_id.to_string())
+            .add_attribute("status", "expired"))
+    }
+}
+
+pub fn expire_bounty(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    msg: ExpireBountyMsg,
+) -> Result<Response, ContractError> {
+    // Load the bounty
+    let mut bounty = BOUNTIES.load(deps.storage, msg.bounty_id)?;
+
+    // Ensure the caller is the bounty issuer
+    if info.sender != bounty.issuer {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    // Check if the bounty has already expired
+    if let Some(end_height) = bounty.end_height {
+        if env.block.height <= end_height {
+            return Err(ContractError::NotYetExpired {});
+        }
+    }
+    if let Some(end_time) = bounty.end_time {
+        if env.block.time <= end_time {
+            return Err(ContractError::NotYetExpired {});
+        }
+    }
+
+    // Mark the bounty as expired
+    bounty.status = BountyStatus::Expired;
+
+    // Refund the funds to the issuer
+    let refund = BankMsg::Send {
+        to_address: bounty.issuer.to_string(),
+        amount: vec![Coin {
+            denom: bounty.token_denom.clone(),
+            amount: bounty.balance,
+        }],
+    };
+
+    BOUNTIES.save(deps.storage, msg.bounty_id, &bounty)?;
+
+    Ok(Response::new()
+        .add_message(refund)
+        .add_attribute("action", "expire_bounty")
+        .add_attribute("bounty_id", msg.bounty_id.to_string())
+        .add_attribute("status", "expired"))
+}
+
+        
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
